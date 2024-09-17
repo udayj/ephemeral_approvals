@@ -4,7 +4,7 @@ pub mod AccountWithEphemeralApproval {
     use openzeppelin::account::AccountComponent;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::token::erc20::interface::{IERC20DispatcherTrait, IERC20Dispatcher};
-    use starknet:: {get_block_timestamp, get_caller_address, get_contract_address};
+    use starknet::{get_block_timestamp, get_caller_address, get_contract_address};
     use starknet::ContractAddress;
     use ephemeral_approvals::interfaces::iephemeralapproval::IEphemeralApproval;
 
@@ -17,7 +17,7 @@ pub mod AccountWithEphemeralApproval {
         AccountComponent::AccountMixinImpl<ContractState>;
     impl AccountInternalImpl = AccountComponent::InternalImpl<ContractState>;
 
-     #[storage]
+    #[storage]
     struct Storage {
         allowances: LegacyMap<(ContractAddress, ContractAddress), (u256, u64)>,
         #[substorage(v0)]
@@ -42,33 +42,35 @@ pub mod AccountWithEphemeralApproval {
 
     #[abi(embed_v0)]
     impl EphemeralApprovalImpl of IEphemeralApproval<ContractState> {
-
-        fn approve(ref self: ContractState, spender: ContractAddress, token: ContractAddress, amount: u256, valid_till: u64) -> bool {
-
+        fn approve(
+            ref self: ContractState,
+            spender: ContractAddress,
+            token: ContractAddress,
+            amount: u256,
+            valid_till: u64
+        ) -> bool {
+            self.account.assert_only_self();
             assert(valid_till > get_block_timestamp(), 'Cannot provide approval in past');
             assert(spender != get_contract_address(), 'Cannot approve self');
             assert(!token.is_zero(), 'Token cannot be zero');
             self.allowances.write((spender, token), (amount, valid_till));
             return true;
-            
         }
 
-        fn transfer_to(ref self: ContractState, to: ContractAddress, token: ContractAddress, amount: u256) -> bool {
-
+        fn transfer_to(
+            ref self: ContractState, to: ContractAddress, token: ContractAddress, amount: u256
+        ) -> bool {
             let spender = get_caller_address();
             assert(spender != get_contract_address(), 'Not callable by self');
 
             let (allowance, valid_till) = self.allowances.read((spender, token));
             assert(valid_till > get_block_timestamp(), 'Approval expired');
 
-            assert( amount <= allowance, 'Approval not enough for amount');
-            self.allowances.write((spender, token), (allowance-amount, valid_till));
+            assert(amount <= allowance, 'Approval not enough for amount');
+            self.allowances.write((spender, token), (allowance - amount, valid_till));
 
-            IERC20Dispatcher {contract_address : token}.transfer(to, amount);
+            IERC20Dispatcher { contract_address: token }.transfer(to, amount);
             return true;
-
         }
-
     }
-
 }
