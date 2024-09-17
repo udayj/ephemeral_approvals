@@ -63,12 +63,16 @@ pub mod AccountWithEphemeralApproval {
             let spender = get_caller_address();
             assert(spender != get_contract_address(), 'Not callable by self');
 
+            // Check that approval is still valid
+            // We dont care about un recognised tokens because valid_till be 0 for such tokens
             let (allowance, valid_till) = self.allowances.read((spender, token));
             assert(valid_till > get_block_timestamp(), 'Approval expired');
 
+            // Check amount
             assert(amount <= allowance, 'Approval not enough for amount');
             self.allowances.write((spender, token), (allowance - amount, valid_till));
 
+            // Do transfer
             IERC20Dispatcher { contract_address: token }.transfer(to, amount);
             return true;
         }
